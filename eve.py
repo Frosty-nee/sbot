@@ -2,8 +2,6 @@ import datetime
 from math import sqrt
 import operator
 import time
-from xml.dom import minidom
-import xml.parsers.expat
 
 import psycopg2
 import requests
@@ -64,6 +62,7 @@ def price_check(cmd):
 				return None
 			cmd.reply('Item not found')
 			return None
+<<<<<<< HEAD
 	def format_prices(prices):
 		if prices is None:
 			return 'n/a'
@@ -71,6 +70,8 @@ def price_check(cmd):
 			return 'bid {0:g} ask {1:g} vol {2:,d}'.format(*prices)
 		prices = map(int, prices)
 		return 'bid {0:,d} ask {1:,d} vol {2:,d}'.format(*prices)
+=======
+>>>>>>> 6f2b171a5e92b8237f81a563edc7a40e2975c6b8
 
 	def get_esi_price(typeid):
 		now = time.time()
@@ -97,8 +98,12 @@ def price_check(cmd):
 		return
 	typeid, item_name = result
 	esi = get_esi_price(typeid)
+<<<<<<< HEAD
 	cmd.reply(item_name, esi)
 
+=======
+	cmd.reply('%s: %s' % (item_name, esi))
+>>>>>>> 6f2b171a5e92b8237f81a563edc7a40e2975c6b8
 
 def jumps(cmd):
 	split = cmd.args.split()
