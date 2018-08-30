@@ -3,7 +3,7 @@ from math import sqrt
 import operator
 import time
 
-import psycopg2
+import sqlite3
 import requests
 
 import config
@@ -11,7 +11,8 @@ import config
 rs = requests.Session()
 rs.headers.update({'User-Agent': 'sbot'})
 if config.bot.eve_dsn is not None:
-	db = psycopg2.connect(config.bot.eve_dsn)
+	conn = sqlite3.connect(config.bot.eve_dsn)
+	curs = conn.cursor()
 
 esi_price_cache = {'last_update': 0, 'items': {}}
 def price_check(cmd):
@@ -32,9 +33,9 @@ def price_check(cmd):
 				return results[0]
 		if len(results) >= 2:
 			return results
-		return None
+		return
 	def item_info(item_name):
-		with db.cursor() as curs:
+		with conn.cursor() as curs:
 			# exact match
 			curs.execute(
 					'SELECT "typeID", "typeName" FROM "invTypes" WHERE LOWER("typeName") LIKE %s',
@@ -62,7 +63,6 @@ def price_check(cmd):
 				return None
 			cmd.reply('Item not found')
 			return None
-<<<<<<< HEAD
 	def format_prices(prices):
 		if prices is None:
 			return 'n/a'
@@ -70,8 +70,6 @@ def price_check(cmd):
 			return 'bid {0:g} ask {1:g} vol {2:,d}'.format(*prices)
 		prices = map(int, prices)
 		return 'bid {0:,d} ask {1:,d} vol {2:,d}'.format(*prices)
-=======
->>>>>>> 6f2b171a5e92b8237f81a563edc7a40e2975c6b8
 
 	def get_esi_price(typeid):
 		now = time.time()
@@ -98,19 +96,14 @@ def price_check(cmd):
 		return
 	typeid, item_name = result
 	esi = get_esi_price(typeid)
-<<<<<<< HEAD
-	cmd.reply(item_name, esi)
-
-=======
 	cmd.reply('%s: %s' % (item_name, esi))
->>>>>>> 6f2b171a5e92b8237f81a563edc7a40e2975c6b8
 
 def jumps(cmd):
 	split = cmd.args.split()
 	if len(split) != 2:
 		cmd.reply('usage: `!jumps [from] [to]`')
 		return
-	with db.cursor() as curs:
+	with conn.cursor() as curs:
 		curs.execute('''
 				SELECT "solarSystemName" FROM "mapSolarSystems"
 				WHERE LOWER("solarSystemName") LIKE %s OR LOWER("solarSystemName") LIKE %s
@@ -151,12 +144,11 @@ def lightyears(cmd):
 		cmd.reply('usage: !ly [from] [to]')
 		return
 
-	with db.cursor() as curs:
-		curs.execute('''
-				SELECT "solarSystemName", x, y, z FROM "mapSolarSystems"
-				WHERE LOWER("solarSystemName") LIKE %s OR LOWER("solarSystemName") LIKE %s
-				''', split)
-		result = curs.fetchmany(6)
+	curs.execute('''
+			SELECT "solarSystemName", x, y, z FROM "mapSolarSystems"
+			WHERE LOWER("solarSystemName") LIKE ? OR LOWER("solarSystemName") LIKE ?
+			''', (split[0], split[1]))
+	result = curs.fetchmany(6)
 	if len(result) < 2:
 		cmd.reply('error: one or both systems not found')
 		return
@@ -170,19 +162,19 @@ def lightyears(cmd):
 	dist = sqrt(dist) / 9.4605284e15 # meters to lightyears
 	ship_ranges = [
 		('other:', 3.5),
-		('blackops:', 4.0),
-		('jump freighter:', 5.0),
+		('blops:', 4.0),
+		('JF:', 5.0),
 		('super:', 3.0),
 	]
 	jdc = []
 	for ship, jump_range in ship_ranges:
 		for level in range(0, 6):
 			if dist <= jump_range * (1 + level * 0.2):
-				jdc.append('%s %d' % (ship, level))
+				jdc.append('%s\t%d' % (ship, level))
 				break
 		else:
-			jdc.append(ship + ' N/A')
-	cmd.reply('%s ⟷ %s: %.3f ly\n%s' % (result[0][0], result[1][0], dist, '\n'.join(jdc)))
+			jdc.append(ship + '\tN/A')
+	cmd.reply('```%s ⟷ %s: %.3f ly\n%s```' % (result[0][0], result[1][0], dist, '\n'.join(jdc)))
 
 def who(cmd):
 	dt_format = '%Y-%m-%dT%H:%M:%SZ'
