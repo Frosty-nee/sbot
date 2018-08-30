@@ -39,7 +39,7 @@ def main():
 		'roles': management.list_roles,
 		'groups': management.list_roles,
 
-		'headpat': reddit.headpat,
+#		'headpat': reddit.headpat,
 
 		'pc': poe.price,
 	})
