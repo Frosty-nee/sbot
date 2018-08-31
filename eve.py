@@ -99,44 +99,53 @@ def price_check(cmd):
 	cmd.reply('%s: %s' % (item_name, esi))
 
 def jumps(cmd):
+
+	def security_class(truesec):
+		if truesec >= 0.5:
+				return("High")
+		elif truesec >=0.0 and truesec < 0.5:
+				return("Low")
+		else:
+				return("High")
+	
 	split = cmd.args.split()
-	if len(split) != 2:
+	if len(split) > 3:
 		cmd.reply('usage: `!jumps [from] [to]`')
 		return
-	with conn.cursor() as curs:
-		curs.execute('''
-				SELECT "solarSystemName" FROM "mapSolarSystems"
-				WHERE LOWER("solarSystemName") LIKE %s OR LOWER("solarSystemName") LIKE %s
-				''', (split[0].lower() + '%', split[1].lower() + '%')
-		)
-		results = list(map(operator.itemgetter(0), curs.fetchmany(2)))
+	curs.execute('''
+			SELECT "solarSystemID" FROM "mapSolarSystems"
+			WHERE "solarSystemName" LIKE ? OR "solarSystemName" LIKE ?
+			''', (split[0], split[1]))
+	
+	results = list(map(operator.itemgetter(0), curs.fetchmany(2)))
 	query = [None, None]
-	for i, s in enumerate(split):
-		s = s.lower()
-		for r in results:
-			if r.lower().startswith(s):
-				query[i] = r
-				break
-		else:
-			cmd.reply('could not find system starting with ' + s)
-			break
-	if None in query:
-		return
-	r = rs.get('http://api.eve-central.com/api/route/from/%s/to/%s' % (query[0], query[1]))
+	if len(split) < 3:
+		split.append('shortest')
+	r = rs.get('https://esi.evetech.net/latest/route/{}/{}/?datasource=tranquility'
+					.format(results[0], results[1]))
 	try:
-		data = r.json()
+			data = r.json()
 	except ValueError:
 		cmd.reply('error getting jumps')
 		return
 	jumps_split = []
 	for j in data:
-		j_str = j['to']['name']
-		from_sec = j['from']['security']
-		to_sec = j['to']['security']
-		if from_sec != to_sec:
-			j_str += ' (%0.1g)' % to_sec
-		jumps_split.append(j_str)
-	cmd.reply('%d jumps: %s' % (len(data), ', '.join(jumps_split)))
+			curs.execute('''SELECT "solarSystemName", "security" 
+							FROM "mapSolarSystems" 
+							WHERE "solarSystemID" = ?''', (j,))
+			result = curs.fetchone()
+			jumps_split.append([result[0], security_class(result[1])])
+	repl = '{} jumps:\n'.format(len(jumps_split))
+	for jump in range(0, len(jumps_split)):
+			if jumps_split[jump] == None:
+					break
+			if jumps_split[jump][1] != jumps_split[jump - 1][1]:
+					repl += ('{} ({})'.format(jumps_split[jump][0],jumps_split[jump][1]))
+			else:
+					repl += ('{}'.format(jumps_split[jump][0]))
+			if jump < len(jumps_split)-1:
+					repl += ' -> '
+	cmd.reply(repl)
 
 def lightyears(cmd):
 	split = [n + '%' for n in cmd.args.lower().split()]
