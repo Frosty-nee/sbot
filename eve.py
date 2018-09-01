@@ -19,7 +19,7 @@ def price_check(cmd):
 	def __item_info(curs, query):
 		curs.execute('''
 			SELECT "typeID", "typeName" FROM "invTypes"
-			WHERE LOWER("typeName") LIKE %s AND "marketGroupID" IS NOT NULL
+			WHERE LOWER("typeName") LIKE ? AND "marketGroupID" IS NOT NULL
 			''', (query.lower(),))
 		results = curs.fetchmany(3)
 		if len(results) == 1:
@@ -35,10 +35,9 @@ def price_check(cmd):
 			return results
 		return
 	def item_info(item_name):
-		with conn.cursor() as curs:
 			# exact match
 			curs.execute(
-					'SELECT "typeID", "typeName" FROM "invTypes" WHERE LOWER("typeName") LIKE %s',
+					'SELECT "typeID", "typeName" FROM "invTypes" WHERE LOWER("typeName") LIKE ?',
 					(item_name.lower(),))
 			result = curs.fetchone()
 			if result:
@@ -115,7 +114,7 @@ def jumps(cmd):
 	curs.execute('''
 			SELECT "solarSystemID" FROM "mapSolarSystems"
 			WHERE "solarSystemName" LIKE ? OR "solarSystemName" LIKE ?
-			''', (split[0], split[1]))
+			''', (split[0]+"%", split[1]+"%"))
 	
 	results = list(map(operator.itemgetter(0), curs.fetchmany(2)))
 	query = [None, None]
