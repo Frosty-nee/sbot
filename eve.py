@@ -98,7 +98,6 @@ def price_check(cmd):
 	cmd.reply('%s: %s' % (item_name, esi))
 
 def jumps(cmd):
-
 	def security_class(truesec):
 		if truesec >= 0.5:
 				return("High")
@@ -117,11 +116,18 @@ def jumps(cmd):
 			''', (split[0]+"%", split[1]+"%"))
 	
 	results = list(map(operator.itemgetter(0), curs.fetchmany(2)))
-	query = [None, None]
+	if len(results) < 2:
+			cmd.reply('one or more systems not found')
+			return
 	if len(split) < 3:
 		split.append('shortest')
-	r = rs.get('https://esi.evetech.net/latest/route/{}/{}/?datasource=tranquility'
-					.format(results[0], results[1]))
+	if len(split) == 3:
+			secure_synonyms = ['safe', 'secure']
+			if split[2] in secure_synonyms:
+					split[2] = 'secure'
+	
+	r = rs.get('https://esi.evetech.net/latest/route/{}/{}/?datasource=tranquility{}'
+					.format(results[0], results[1],'&flag={}'.format(split[2])))
 	try:
 			data = r.json()
 	except ValueError:
