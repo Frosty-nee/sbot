@@ -170,19 +170,19 @@ def lightyears(cmd):
 		dist += (d1 - d2)**2
 	dist = sqrt(dist) / 9.4605284e15 # meters to lightyears
 	ship_ranges = [
-		('other:', 3.5),
-		('blops:', 4.0),
-		('JF:', 5.0),
-		('super:', 3.0),
+		('other:\t ', 3.5),
+		('blops:\t ', 4.0),
+		('JF:\t\t', 5.0),
+		('super:\t ', 3.0),
 	]
 	jdc = []
 	for ship, jump_range in ship_ranges:
 		for level in range(0, 6):
 			if dist <= jump_range * (1 + level * 0.2):
-				jdc.append('%s\t%d' % (ship, level))
+				jdc.append('%s%d' % (ship, level))
 				break
 		else:
-			jdc.append(ship + '\tN/A')
+			jdc.append(ship + 'N/A')
 	cmd.reply('```%s ⟷ %s: %.3f ly\n%s```' % (result[0][0], result[1][0], dist, '\n'.join(jdc)))
 
 def who(cmd):
