@@ -98,24 +98,18 @@ def price_check(cmd):
 	cmd.reply('%s: %s' % (item_name, esi))
 
 def jumps(cmd):
-	def security_class(truesec):
-		if truesec >= 0.5:
-				return("High")
-		elif truesec >=0.0 and truesec < 0.5:
-				return("Low")
-		else:
-				return("High")
-	
 	split = cmd.args.split()
 	if len(split) > 3:
 		cmd.reply('usage: `!jumps [from] [to]`')
 		return
-	curs.execute('''
-			SELECT "solarSystemID" FROM "mapSolarSystems"
-			WHERE "solarSystemName" LIKE ? OR "solarSystemName" LIKE ?
-			''', (split[0]+"%", split[1]+"%"))
-	
-	results = list(map(operator.itemgetter(0), curs.fetchmany(2)))
+	results = []
+	for i in range(2):
+		curs.execute('''
+				SELECT "solarSystemID" FROM "mapSolarSystems"
+				WHERE "solarSystemName" LIKE ?
+				''', (split[i],))
+		results.append(operator.itemgetter(0)(curs.fetchone()))
+	curs.fetchall()
 	if len(results) < 2:
 			cmd.reply('one or more systems not found')
 			return
@@ -125,6 +119,8 @@ def jumps(cmd):
 			secure_synonyms = ['safe', 'secure']
 			if split[2] in secure_synonyms:
 					split[2] = 'secure'
+			else:
+					split[2] = 'shortest'
 	
 	r = rs.get('https://esi.evetech.net/latest/route/{}/{}/?datasource=tranquility{}'
 					.format(results[0], results[1],'&flag={}'.format(split[2])))
@@ -138,19 +134,10 @@ def jumps(cmd):
 			curs.execute('''SELECT "solarSystemName", "security" 
 							FROM "mapSolarSystems" 
 							WHERE "solarSystemID" = ?''', (j,))
-			result = curs.fetchone()
-			jumps_split.append([result[0], security_class(result[1])])
-	repl = '{} jumps:\n'.format(len(jumps_split))
-	for jump in range(0, len(jumps_split)):
-			if jumps_split[jump] == None:
-					break
-			if jumps_split[jump][1] != jumps_split[jump - 1][1]:
-					repl += ('{} ({})'.format(jumps_split[jump][0],jumps_split[jump][1]))
-			else:
-					repl += ('{}'.format(jumps_split[jump][0]))
-			if jump < len(jumps_split)-1:
-					repl += ' -> '
-	cmd.reply(repl)
+			result = list(map(str,curs.fetchone()))
+			result[1] = result[1][:3]
+			jumps_split.append(" ".join(result))
+	cmd.reply('{} jumps:\n'.format(len(jumps_split)-1) + " -> ".join(jumps_split))
 
 def lightyears(cmd):
 	split = [n + '%' for n in cmd.args.lower().split()]
