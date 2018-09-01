@@ -179,52 +179,61 @@ def lightyears(cmd):
 
 def who(cmd):
 	dt_format = '%Y-%m-%dT%H:%M:%SZ'
+	char_id, corp_id, alliance_id, = None, None, None
 	try:
 		r = rs.post('https://esi.evetech.net/latest/universe/ids/',
 			params={'datasource': 'tranquility', 'language': 'en-us'},
 			json=[cmd.args])
 		r.raise_for_status()
-
+	
 		if len(r.json().keys()) == 0:
 			cmd.reply("%s: couldn't find your sleazebag" % cmd.sender['username'])
 			return
-
-		char_id = int(r.json()['characters'][0]['id'])
-
-		r = rs.get('https://esi.evetech.net/v4/characters/%d/' % char_id)
-		r.raise_for_status()
-		data = r.json()
-		char_name = data['name']
-		corp_id = int(data['corporation_id'])
-		birthday = data['birthday']
-		birthday = datetime.datetime.strptime(birthday, dt_format).date()
-		security_status = data['security_status']
-		output = '%s: born %s, security status %.2f  ' % (char_name, birthday, security_status)
-		output += 'https://zkillboard.com/character/%d/' % char_id
-
-		r = rs.get('https://esi.evetech.net/v3/corporations/%d/' % corp_id)
-		r.raise_for_status()
-		data = r.json()
-		corp_name = data['corporation_name']
-		creation_date = data.get('creation_date') # NPC corps have no creation_date
-		if creation_date:
-			creation_date = str(datetime.datetime.strptime(creation_date, dt_format).date())
+		if 'characters' in r.json().keys():
+			char_id = int(r.json()['characters'][0]['id'])
+		elif 'corporations' in r.json().keys():
+			corp_id = int(r.json()['corporations'][0]['id'])
 		else:
-			creation_date = '?'
-		members = data['member_count']
-		alliance_id = data.get('alliance_id')
-		output += '\n%s: created %s, %s members  ' % (corp_name, creation_date, members)
-		output += 'https://zkillboard.com/corporation/%d/' % (corp_id)
+			alliance_id = int(r.json()['alliances'][0]['id'])
+		
+		route='https://esi.evetech.net/latest/{}/{}'
+		output=''
+		if char_id:
+				r=rs.get(route.format('characters', char_id))
+				r.raise_for_status()
+				data = r.json()
+				char_name = data['name']
+				corp_id = int(data['corporation_id'])
+				birthday = data['birthday']
+				birthday = datetime.datetime.strptime(birthday, dt_format).date()
+				security_status = data['security_status']
+				output = '%s: born %s, security status %.2f  ' % (char_name, birthday, security_status)
+				output += 'https://zkillboard.com/character/%d/' % char_id
+		if corp_id:
+				r=rs.get(route.format('corporations', corp_id))
+				data = r.json()
+				print(data)
+				corp_name = data['name']
+				creation_date = data.get('creation_date') # NPC corps have no creation_date
+				if creation_date:
+					creation_date = str(datetime.datetime.strptime(creation_date, dt_format).date())
+				else:
+					creation_date = '?'
+				members = data['member_count']
+				alliance_id = data.get('alliance_id')
+				output += '\n%s: created %s, %s members  ' % (corp_name, creation_date, members)
+				output += 'https://zkillboard.com/corporation/%d/' % (corp_id)
 
 		if alliance_id:
-			alliance_id = int(alliance_id)
-			r = rs.get('https://esi.evetech.net/v2/alliances/%d/' % alliance_id)
-			r.raise_for_status()
-			data = r.json()
-			alliance_name = data['alliance_name']
-			founding_date = data['date_founded']
-			founding_date = datetime.datetime.strptime(founding_date, dt_format).date()
-			output += '\n%s: founded %s' % (alliance_name, founding_date)
+				r=rs.get(route.format('alliances', alliance_id))
+				alliance_id = int(alliance_id)
+				r = rs.get('https://esi.evetech.net/v2/alliances/%d/' % alliance_id)
+				r.raise_for_status()
+				data = r.json()
+				alliance_name = data['alliance_name']
+				founding_date = data['date_founded']
+				founding_date = datetime.datetime.strptime(founding_date, dt_format).date()
+				output += '\n%s: founded %s' % (alliance_name, founding_date)
 
 		cmd.reply(output)
 	except requests.exceptions.HTTPError:
