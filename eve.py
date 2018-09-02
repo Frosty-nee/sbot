@@ -15,6 +15,8 @@ if config.bot.eve_dsn is not None:
 	curs = conn.cursor()
 
 esi_price_cache = {'last_update': 0, 'items': {}}
+
+
 def price_check(cmd):
 	def __item_info(curs, query):
 		curs.execute('''
@@ -25,7 +27,7 @@ def price_check(cmd):
 		if len(results) == 1:
 			return results[0]
 		if len(results) == 2 and \
-				results[0][1].endswith('Blueprint') ^ results[1][1].endswith('Blueprint'):
+                        results[0][1].endswith('Blueprint') ^ results[1][1].endswith('Blueprint'):
 			# an item and its blueprint; show the item
 			if results[0][1].endswith('Blueprint'):
 				return results[1]
@@ -34,6 +36,7 @@ def price_check(cmd):
 		if len(results) >= 2:
 			return results
 		return
+
 	def item_info(item_name):
 		# exact match
 		curs.execute(
@@ -62,6 +65,7 @@ def price_check(cmd):
 			return None
 		cmd.reply('Item not found')
 		return None
+
 	def format_prices(prices):
 		if prices is None:
 			return 'n/a'
@@ -73,7 +77,8 @@ def price_check(cmd):
 	def get_esi_price(typeid):
 		now = time.time()
 		if esi_price_cache['last_update'] < now - 60 * 60 * 2:
-			res = rs.get('https://esi.evetech.net/latest/markets/prices/?datasource=tranquility')
+			res = rs.get(
+				'https://esi.evetech.net/latest/markets/prices/?datasource=tranquility')
 			if res.status_code == 200:
 				esi_price_cache['items'].clear()
 				for item in res.json():
@@ -96,6 +101,7 @@ def price_check(cmd):
 	typeid, item_name = result
 	esi = get_esi_price(typeid)
 	cmd.reply('%s: %s' % (item_name, esi))
+
 
 def jumps(cmd):
 	split = cmd.args.split()
@@ -121,9 +127,9 @@ def jumps(cmd):
 			split[2] = 'secure'
 		else:
 			split[2] = 'shortest'
-	
+
 	r = rs.get('https://esi.evetech.net/latest/route/{}/{}/?datasource=tranquility{}'
-		.format(results[0], results[1],'&flag={}'.format(split[2])))
+            .format(results[0], results[1], '&flag={}'.format(split[2])))
 	try:
 		data = r.json()
 	except ValueError:
@@ -134,10 +140,11 @@ def jumps(cmd):
 		curs.execute('''SELECT "solarSystemName", "security" 
 						FROM "mapSolarSystems" 
 						WHERE "solarSystemID" = ?''', (j,))
-		result = list(map(str,curs.fetchone()))
+		result = list(map(str, curs.fetchone()))
 		result[1] = result[1][:3]
 		jumps_split.append(" ".join(result))
 	cmd.reply('{} jumps:\n'.format(len(jumps_split)-1) + " -> ".join(jumps_split))
+
 
 def lightyears(cmd):
 	split = [n + '%' for n in cmd.args.lower().split()]
@@ -154,13 +161,14 @@ def lightyears(cmd):
 		cmd.reply('error: one or both systems not found')
 		return
 	elif len(result) > 2:
-		cmd.reply('error: found too many systems: ' + ' '.join(map(operator.itemgetter(0), result)))
+		cmd.reply('error: found too many systems: ' +
+		          ' '.join(map(operator.itemgetter(0), result)))
 		return
 
 	dist = 0
 	for d1, d2 in zip(result[0][1:], result[1][1:]):
 		dist += (d1 - d2)**2
-	dist = sqrt(dist) / 9.4605284e15 # meters to lightyears
+	dist = sqrt(dist) / 9.4605284e15  # meters to lightyears
 	ship_ranges = [
 		('other:\t ', 3.5),
 		('blops:\t ', 4.0),
@@ -175,66 +183,40 @@ def lightyears(cmd):
 				break
 		else:
 			jdc.append(ship + 'N/A')
-	cmd.reply('```%s ⟷ %s: %.3f ly\n%s```' % (result[0][0], result[1][0], dist, '\n'.join(jdc)))
+	cmd.reply('```%s ⟷ %s: %.3f ly\n%s```' %
+	          (result[0][0], result[1][0], dist, '\n'.join(jdc)))
+
 
 def who(cmd):
+	char_info, corp_info, alliance_info = None, None, None
+	def get_char_info(char):
+		r=rs.get('https://esi.evetech.net/latest/characters/{}/'.format(char),params={'datasource':'tranquility'})
+		char_info=r.json()
+		return(char_info)
+	def get_corp_info(corp):
+		r=rs.get('https://esi.evetech.net/latest/corporations/{}/'.format(corp), params={'datasource': 'tranquility'})
+		corp_info=r.json()
+		return(corp_info)
+	def get_alliance_info(ally):
+		r=rs.get('https://esi.evetech.net/latest/alliances/{}/'.format(ally), params={'datasource': 'tranquility'})
+		alliance_info=r.json()
+		return(alliance_info)
 	dt_format = '%Y-%m-%dT%H:%M:%SZ'
 	char_id, corp_id, alliance_id, = None, None, None
 	try:
 		r = rs.post('https://esi.evetech.net/latest/universe/ids/',
-			params={'datasource': 'tranquility', 'language': 'en-us'},
-			json=[cmd.args])
+                    params={'datasource': 'tranquility', 'language': 'en-us'},
+                    json=[cmd.args])
 		r.raise_for_status()
-	
 		if len(r.json().keys()) == 0:
 			cmd.reply("%s: couldn't find your sleazebag" % cmd.sender['username'])
 			return
 		if 'characters' in r.json().keys():
-			char_id = int(r.json()['characters'][0]['id'])
+			get_char_info(r.json()['characters'][0])
 		elif 'corporations' in r.json().keys():
-			corp_id = int(r.json()['corporations'][0]['id'])
+			get_corp_info(r.json()['corporations'][0]['id'])
 		else:
-			alliance_id = int(r.json()['alliances'][0]['id'])
-		
-		route='https://esi.evetech.net/latest/{}/{}'
-		output=''
-		if char_id:
-			r=rs.get(route.format('characters', char_id))
-			r.raise_for_status()
-			data = r.json()
-			char_name = data['name']
-			corp_id = int(data['corporation_id'])
-			birthday = data['birthday']
-			birthday = datetime.datetime.strptime(birthday, dt_format).date()
-			security_status = data['security_status']
-			output = '%s: born %s, security status %.2f  ' % (char_name, birthday, security_status)
-			output += 'https://zkillboard.com/character/%d/' % char_id
-		if corp_id:
-			r=rs.get(route.format('corporations', corp_id))
-			data = r.json()
-			print(data)
-			corp_name = data['name']
-			creation_date = data.get('creation_date') # NPC corps have no creation_date
-			if creation_date:
-				creation_date = str(datetime.datetime.strptime(creation_date, dt_format).date())
-			else:
-				creation_date = '?'
-			members = data['member_count']
-			alliance_id = data.get('alliance_id')
-			output += '\n%s: created %s, %s members  ' % (corp_name, creation_date, members)
-			output += 'https://zkillboard.com/corporation/%d/' % (corp_id)
+			get_alliance_info(r.json()['alliances'][0]['id'])
 
-		if alliance_id:
-			r=rs.get(route.format('alliances', alliance_id))
-			alliance_id = int(alliance_id)
-			r = rs.get('https://esi.evetech.net/v2/alliances/%d/' % alliance_id)
-			r.raise_for_status()
-			data = r.json()
-			alliance_name = data['alliance_name']
-			founding_date = data['date_founded']
-			founding_date = datetime.datetime.strptime(founding_date, dt_format).date()
-	 		output += '\n%s: founded %s' % (alliance_name, founding_date)
-
-		cmd.reply(output)
 	except requests.exceptions.HTTPError:
 		cmd.reply("%s: couldn't find your sleazebag" % cmd.sender['username'])
