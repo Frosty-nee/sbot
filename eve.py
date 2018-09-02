@@ -184,15 +184,24 @@ def lightyears(cmd):
 		else:
 			jdc.append(ship + 'N/A')
 	cmd.reply('```%s ⟷ %s: %.3f ly\n%s```' %
-	          (result[0][0], result[1][0], dist, '\n'.join(jdc)))
+		(result[0][0], result[1][0], dist, '\n'.join(jdc)))
 
 
 def who(cmd):
 	char_info, corp_info, alliance_info = None, None, None
-	def get_char_info(char):
-		r=rs.get('https://esi.evetech.net/latest/characters/{}/'.format(char),params={'datasource':'tranquility'})
+	output = ''
+	entity_type_map = {
+		0: 'characterID',
+		1: 'corporationID',
+		2: 'allianceID'
+		}
+	dt_format = '%Y-%m-%dT%H:%M:%SZ'
+	def get_char_info(char_id):
+		r=rs.get('https://esi.evetech.net/latest/characters/{}/'.format(char_id),params={'datasource':'tranquility'})
 		char_info=r.json()
-		return(char_info)
+		zkill_stats=get_zkill_stats(char_id,0)
+		last_kill=get_last_kill(char_id,0)
+		return(char_info, zkill_stats, last_kill)
 	def get_corp_info(corp):
 		r=rs.get('https://esi.evetech.net/latest/corporations/{}/'.format(corp), params={'datasource': 'tranquility'})
 		corp_info=r.json()
@@ -201,22 +210,76 @@ def who(cmd):
 		r=rs.get('https://esi.evetech.net/latest/alliances/{}/'.format(ally), params={'datasource': 'tranquility'})
 		alliance_info=r.json()
 		return(alliance_info)
-	dt_format = '%Y-%m-%dT%H:%M:%SZ'
+	def get_zkill_stats(entity_id, entity_type):
+		r=rs.get('https://zkillboard.com/api/stats/{entity_type}/{entity_id}/'.format(entity_id=entity_id, entity_type=entity_type_map[entity_type]))
+		return(r.json())
+	def get_last_kill(entity_id, entity_type):
+		r=rs.get('https://zkillboard.com/api/{entity_type}/{entity_id}/'.format(entity_id=entity_id, entity_type=entity_type_map[entity_type]))
+		kills=r.json()
+		return(kills[0])
+	def get_humanized_timedelta(timestamp):
+		last = datetime.datetime.strptime(timestamp, dt_format)
+		now = datetime.datetime.utcnow()
+		delta = now - last
+		
+		delta_dict = {	
+			'year': delta.days/365,
+			'month': delta.days/30,
+			'week': delta.days/7,
+			'day': delta.days,
+			'hour':delta.seconds/3600,
+			'minute':delta.seconds/60,
+			'second':delta.seconds
+		}
+		for k,v in delta_dict.items():
+			if v >= 1:
+				return(k,'{:1.0f}'.format(v))
 	char_id, corp_id, alliance_id, = None, None, None
 	try:
 		r = rs.post('https://esi.evetech.net/latest/universe/ids/',
-                    params={'datasource': 'tranquility', 'language': 'en-us'},
-                    json=[cmd.args])
+			params={'datasource': 'tranquility', 'language': 'en-us'},
+			json=[cmd.args])
 		r.raise_for_status()
 		if len(r.json().keys()) == 0:
 			cmd.reply("%s: couldn't find your sleazebag" % cmd.sender['username'])
 			return
 		if 'characters' in r.json().keys():
-			get_char_info(r.json()['characters'][0])
-		elif 'corporations' in r.json().keys():
-			get_corp_info(r.json()['corporations'][0]['id'])
-		else:
-			get_alliance_info(r.json()['alliances'][0]['id'])
+			char_info, zkill_stats, last_kill = get_char_info(r.json()['characters'][0]['id'])
+			span,value = get_humanized_timedelta(last_kill['killmail_time'])
+			if int(value) > 1:
+				span += 's'
+			output += '{name} ({security:.2f}) [{killed}/{lost}] Last active {value} {span} ago\n'.format(
+					name=char_info['name'],
+					security=char_info['security_status'],
+					killed=zkill_stats['shipsDestroyed'],
+					lost=zkill_stats['shipsLost'],
+					value=value,
+					span=span
+					)
+		if 'corporations' in r.json().keys() or char_info:
+			if char_info:
+				corp_info = get_corp_info(char_info['corporation_id'])
+			else:
+				corp_info = get_corp_info(r.json()['corporations'][0]['id'])
+			if len(output) > 0:
+				output += '{name} [{ticker}] {member_count} members '.format(
+						name=corp_info['name'],
+						ticker=corp_info['ticker'],
+						member_count=corp_info['member_count']
+						)
+			else:
+				pass
+		if 'alliances' in r.json().keys() or corp_info:
+			if corp_info:
+				try:
+					alliance_info = get_alliance_info(corp_info['alliance_id'])
+				except:
+					pass
+			else:
+				alliance_info = get_alliance_info(r.json()['alliances'][0]['id'])
+
+
+		cmd.reply(output)
 
 	except requests.exceptions.HTTPError:
 		cmd.reply("%s: couldn't find your sleazebag" % cmd.sender['username'])
