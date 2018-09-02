@@ -240,46 +240,57 @@ def who(cmd):
 			params={'datasource': 'tranquility', 'language': 'en-us'},
 			json=[cmd.args])
 		r.raise_for_status()
-		if len(r.json().keys()) == 0:
+		initial_id = r.json()
+		if len(initial_id.keys()) == 0:
 			cmd.reply("%s: couldn't find your sleazebag" % cmd.sender['username'])
 			return
-		if 'characters' in r.json().keys():
-			char_info, zkill_stats, last_kill = get_char_info(r.json()['characters'][0]['id'])
+		if 'characters' in initial_id.keys():
+			char_info, char_zkill_stats, last_kill = get_char_info(initial_id['characters'][0]['id'])
 			span,value = get_humanized_timedelta(last_kill['killmail_time'])
+			corp_id = char_info['corporation_id']
 			if int(value) > 1:
 				span += 's'
 			output += '{name} ({security:.2f}) [{killed}/{lost}] Last active {value} {span} ago\n'.format(
 					name=char_info['name'],
 					security=char_info['security_status'],
-					killed=zkill_stats['shipsDestroyed'],
-					lost=zkill_stats['shipsLost'],
+					killed=char_zkill_stats['shipsDestroyed'],
+					lost=char_zkill_stats['shipsLost'],
 					value=value,
 					span=span
 					)
-		if 'corporations' in r.json().keys() or char_info:
+		if 'corporations' in initial_id.keys() or char_info:
 			if char_info:
-				corp_info = get_corp_info(char_info['corporation_id'])
+				corp_info = get_corp_info(corp_id)
 			else:
-				corp_info = get_corp_info(r.json()['corporations'][0]['id'])
-			if len(output) > 0:
-				output += '{name} [{ticker}] {member_count} members '.format(
-						name=corp_info['name'],
-						ticker=corp_info['ticker'],
-						member_count=corp_info['member_count']
-						)
-			else:
-				pass
-		if 'alliances' in r.json().keys() or corp_info:
+				corp_id = initial_id['corporations'][0]['id']
+				corp_info = get_corp_info(corp_id)
+			corp_zkill_stats = get_zkill_stats(corp_id, 1)
+			try:
+				alliance_id = corp_info['alliance_id']
+			except KeyError:
+				alliance_id = None
+			output += '{name} [{ticker}] {active} active members\n'.format(
+					name=corp_info['name'],
+					ticker=corp_info['ticker'],
+					active=corp_zkill_stats['activepvp']['characters']['count']
+					)
+		if 'alliances' in initial_id.keys() or corp_info:
 			if corp_info:
-				try:
-					alliance_info = get_alliance_info(corp_info['alliance_id'])
-				except:
-					pass
+					if alliance_id == None:
+						cmd.reply('```' + output + '```')
+						return
+					alliance_info = get_alliance_info(alliance_id)
 			else:
-				alliance_info = get_alliance_info(r.json()['alliances'][0]['id'])
+				alliance_id = initial_id['alliances'][0]['id']
+				alliance_info = get_alliance_info(alliance_id)
+			alliance_zkill_stats = get_zkill_stats(alliance_id, 2)
+			output += '{name} <{ticker}> {active} active members'.format(
+					name=alliance_info['name'],
+					ticker=alliance_info['ticker'],
+					active=alliance_zkill_stats['activepvp']['characters']['count']
+					)
 
-
-		cmd.reply(output)
+		cmd.reply('```' +output + '```')
 
 	except requests.exceptions.HTTPError:
 		cmd.reply("%s: couldn't find your sleazebag" % cmd.sender['username'])
