@@ -35,33 +35,33 @@ def price_check(cmd):
 			return results
 		return
 	def item_info(item_name):
-			# exact match
-			curs.execute(
-					'SELECT "typeID", "typeName" FROM "invTypes" WHERE LOWER("typeName") LIKE ?',
-					(item_name.lower(),))
-			result = curs.fetchone()
-			if result:
-				return result
+		# exact match
+		curs.execute(
+			'SELECT "typeID", "typeName" FROM "invTypes" WHERE LOWER("typeName") LIKE ?',
+			(item_name.lower(),))
+		result = curs.fetchone()
+		if result:
+			return result
 
-			# start of string match
-			results = __item_info(curs, item_name + '%')
-			if isinstance(results, tuple):
-				return results
-			if results:
-				names = map(lambda r: r[1], results)
-				cmd.reply('Found items: ' + ', '.join(names))
-				return None
-
-			# substring match
-			results = __item_info(curs, '%' + item_name + '%')
-			if isinstance(results, tuple):
-				return results
-			if results:
-				names = map(lambda r: r[1], results)
-				cmd.reply('Found items: ' + ', '.join(names))
-				return None
-			cmd.reply('Item not found')
+		# start of string match
+		results = __item_info(curs, item_name + '%')
+		if isinstance(results, tuple):
+			return results
+		if results:
+			names = map(lambda r: r[1], results)
+			cmd.reply('Found items: ' + ', '.join(names))
 			return None
+
+		# substring match
+		results = __item_info(curs, '%' + item_name + '%')
+		if isinstance(results, tuple):
+			return results
+		if results:
+			names = map(lambda r: r[1], results)
+			cmd.reply('Found items: ' + ', '.join(names))
+			return None
+		cmd.reply('Item not found')
+		return None
 	def format_prices(prices):
 		if prices is None:
 			return 'n/a'
@@ -105,38 +105,38 @@ def jumps(cmd):
 	results = []
 	for i in range(2):
 		curs.execute('''
-				SELECT "solarSystemID" FROM "mapSolarSystems"
-				WHERE "solarSystemName" LIKE ?
-				''', (split[i],))
+			SELECT "solarSystemID" FROM "mapSolarSystems"
+			WHERE "solarSystemName" LIKE ?
+			''', (split[i],))
 		results.append(operator.itemgetter(0)(curs.fetchone()))
 	curs.fetchall()
 	if len(results) < 2:
-			cmd.reply('one or more systems not found')
-			return
+		cmd.reply('one or more systems not found')
+		return
 	if len(split) < 3:
 		split.append('shortest')
 	if len(split) == 3:
-			secure_synonyms = ['safe', 'secure']
-			if split[2] in secure_synonyms:
-					split[2] = 'secure'
-			else:
-					split[2] = 'shortest'
+		secure_synonyms = ['safe', 'secure']
+		if split[2] in secure_synonyms:
+			split[2] = 'secure'
+		else:
+			split[2] = 'shortest'
 	
 	r = rs.get('https://esi.evetech.net/latest/route/{}/{}/?datasource=tranquility{}'
-					.format(results[0], results[1],'&flag={}'.format(split[2])))
+		.format(results[0], results[1],'&flag={}'.format(split[2])))
 	try:
-			data = r.json()
+		data = r.json()
 	except ValueError:
 		cmd.reply('error getting jumps')
 		return
 	jumps_split = []
 	for j in data:
-			curs.execute('''SELECT "solarSystemName", "security" 
-							FROM "mapSolarSystems" 
-							WHERE "solarSystemID" = ?''', (j,))
-			result = list(map(str,curs.fetchone()))
-			result[1] = result[1][:3]
-			jumps_split.append(" ".join(result))
+		curs.execute('''SELECT "solarSystemName", "security" 
+						FROM "mapSolarSystems" 
+						WHERE "solarSystemID" = ?''', (j,))
+		result = list(map(str,curs.fetchone()))
+		result[1] = result[1][:3]
+		jumps_split.append(" ".join(result))
 	cmd.reply('{} jumps:\n'.format(len(jumps_split)-1) + " -> ".join(jumps_split))
 
 def lightyears(cmd):
@@ -146,9 +146,9 @@ def lightyears(cmd):
 		return
 
 	curs.execute('''
-			SELECT "solarSystemName", x, y, z FROM "mapSolarSystems"
-			WHERE LOWER("solarSystemName") LIKE ? OR LOWER("solarSystemName") LIKE ?
-			''', (split[0], split[1]))
+		SELECT "solarSystemName", x, y, z FROM "mapSolarSystems"
+		WHERE LOWER("solarSystemName") LIKE ? OR LOWER("solarSystemName") LIKE ?
+		''', (split[0], split[1]))
 	result = curs.fetchmany(6)
 	if len(result) < 2:
 		cmd.reply('error: one or both systems not found')
@@ -199,41 +199,41 @@ def who(cmd):
 		route='https://esi.evetech.net/latest/{}/{}'
 		output=''
 		if char_id:
-				r=rs.get(route.format('characters', char_id))
-				r.raise_for_status()
-				data = r.json()
-				char_name = data['name']
-				corp_id = int(data['corporation_id'])
-				birthday = data['birthday']
-				birthday = datetime.datetime.strptime(birthday, dt_format).date()
-				security_status = data['security_status']
-				output = '%s: born %s, security status %.2f  ' % (char_name, birthday, security_status)
-				output += 'https://zkillboard.com/character/%d/' % char_id
+			r=rs.get(route.format('characters', char_id))
+			r.raise_for_status()
+			data = r.json()
+			char_name = data['name']
+			corp_id = int(data['corporation_id'])
+			birthday = data['birthday']
+			birthday = datetime.datetime.strptime(birthday, dt_format).date()
+			security_status = data['security_status']
+			output = '%s: born %s, security status %.2f  ' % (char_name, birthday, security_status)
+			output += 'https://zkillboard.com/character/%d/' % char_id
 		if corp_id:
-				r=rs.get(route.format('corporations', corp_id))
-				data = r.json()
-				print(data)
-				corp_name = data['name']
-				creation_date = data.get('creation_date') # NPC corps have no creation_date
-				if creation_date:
-					creation_date = str(datetime.datetime.strptime(creation_date, dt_format).date())
-				else:
-					creation_date = '?'
-				members = data['member_count']
-				alliance_id = data.get('alliance_id')
-				output += '\n%s: created %s, %s members  ' % (corp_name, creation_date, members)
-				output += 'https://zkillboard.com/corporation/%d/' % (corp_id)
+			r=rs.get(route.format('corporations', corp_id))
+			data = r.json()
+			print(data)
+			corp_name = data['name']
+			creation_date = data.get('creation_date') # NPC corps have no creation_date
+			if creation_date:
+				creation_date = str(datetime.datetime.strptime(creation_date, dt_format).date())
+			else:
+				creation_date = '?'
+			members = data['member_count']
+			alliance_id = data.get('alliance_id')
+			output += '\n%s: created %s, %s members  ' % (corp_name, creation_date, members)
+			output += 'https://zkillboard.com/corporation/%d/' % (corp_id)
 
 		if alliance_id:
-				r=rs.get(route.format('alliances', alliance_id))
-				alliance_id = int(alliance_id)
-				r = rs.get('https://esi.evetech.net/v2/alliances/%d/' % alliance_id)
-				r.raise_for_status()
-				data = r.json()
-				alliance_name = data['alliance_name']
-				founding_date = data['date_founded']
-				founding_date = datetime.datetime.strptime(founding_date, dt_format).date()
-				output += '\n%s: founded %s' % (alliance_name, founding_date)
+			r=rs.get(route.format('alliances', alliance_id))
+			alliance_id = int(alliance_id)
+			r = rs.get('https://esi.evetech.net/v2/alliances/%d/' % alliance_id)
+			r.raise_for_status()
+			data = r.json()
+			alliance_name = data['alliance_name']
+			founding_date = data['date_founded']
+			founding_date = datetime.datetime.strptime(founding_date, dt_format).date()
+	 		output += '\n%s: founded %s' % (alliance_name, founding_date)
 
 		cmd.reply(output)
 	except requests.exceptions.HTTPError:
