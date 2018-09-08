@@ -127,6 +127,9 @@ def jumps(cmd):
 		cmd.reply('error getting jumps')
 		return
 	jumps_split = []
+	if 'error' in data:
+		cmd.reply("Error: {}".format(data['error']))
+		return
 	for j in data:
 		curs.execute('''SELECT "solarSystemName", "security"
 						FROM "mapSolarSystems"
